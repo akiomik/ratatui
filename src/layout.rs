@@ -790,12 +790,94 @@ impl Element {
     }
 }
 
+/// A macro to create a layout with specified constraints.
+///
+/// This macro takes a list of constraints and a rectangle (`rect`) and
+/// applies the constraints to the layout of the rectangle.
+///
+/// # Arguments
+///
+/// * `[$($constraint:expr),+]` - A list of constraints in various formats (percentage, ratio, fixed
+///   length, min, max) to be applied to the layout.
+/// * `$rect:ident` - An identifier representing a rectangle to which the layout will be applied.
+///
+/// # Returns
+///
+/// Returns a collection of rectangles (`Rc<[rect::Rect]>`) after applying the
+/// layout constraints to the given rectangle.
+#[macro_export]
+macro_rules! layout {
+    ([$($constraint:expr),+], $rect:ident) => {{
+        let constraints = vec![$(_parse_constraint($constraint)),+];
+        let layout = Layout::default().constraints::<Vec<Constraint>>(constraints);
+        layout.split($rect)
+    }};
+}
+
+/// Parses a string representation of a layout constraint into a `Constraint` object.
+///
+/// This function supports various formats for constraints: percentage (n%), ratio (n/d),
+/// fixed length (==n), minimum (>=n), and maximum (<=n).
+///
+/// # Arguments
+///
+/// * `constraint` - A string slice representing the constraint.
+///
+/// # Returns
+///
+/// Returns a `Constraint` object corresponding to the input string.
+///
+/// # Panics
+///
+/// Panics if the constraint format is invalid or unsupported.
+fn _parse_constraint(constraint: &str) -> Constraint {
+    if constraint.ends_with('%') {
+        if let Ok(value) = constraint.trim_end_matches('%').parse::<u16>() {
+            return Constraint::Percentage(value);
+        }
+    } else if let Some((numerator, denominator)) = constraint.split_once('/') {
+        if let (Ok(n), Ok(d)) = (numerator.parse::<u32>(), denominator.parse::<u32>()) {
+            return Constraint::Ratio(n, d);
+        }
+    } else if constraint.starts_with("==") {
+        if let Ok(value) = constraint.trim_start_matches("==").parse::<u16>() {
+            return Constraint::Length(value);
+        }
+    } else if constraint.starts_with("<=") {
+        if let Ok(value) = constraint.trim_start_matches("<=").parse::<u16>() {
+            return Constraint::Max(value);
+        }
+    } else if constraint.starts_with(">=") {
+        if let Ok(value) = constraint.trim_start_matches(">=").parse::<u16>() {
+            return Constraint::Min(value);
+        }
+    }
+    // Fallback or error handling for unsupported or invalid constraints
+    panic!("Invalid constraint format: {:?}", constraint)
+}
+
 #[cfg(test)]
 mod tests {
     use strum::ParseError;
 
     use super::{SegmentSize::*, *};
-    use crate::prelude::Constraint::*;
+    use crate::{layout, prelude::Constraint::*};
+
+    #[test]
+    fn macro_constraints() {
+        let rect = Rect {
+            x: 0,
+            y: 0,
+            width: 10,
+            height: 10,
+        };
+
+        let [rect1, rect2] = *layout!(["100%", ">=3"], rect) else {
+            panic!("unable to extract")
+        };
+        assert_eq!(rect1, Rect::new(0, 0, 10, 7));
+        assert_eq!(rect2, Rect::new(0, 7, 10, 3));
+    }
 
     #[test]
     fn custom_cache_size() {

@@ -806,7 +806,7 @@ impl Element {
 /// Returns a collection of rectangles (`Rc<[rect::Rect]>`) after applying the
 /// layout constraints to the given rectangle.
 #[macro_export]
-macro_rules! layout {
+macro_rules! split_layout {
     ([$($constraint:expr),+], $rect:ident) => {{
         let constraints = vec![$(_parse_constraint($constraint)),+];
         let layout = Layout::default().constraints::<Vec<Constraint>>(constraints);
@@ -861,7 +861,7 @@ mod tests {
     use strum::ParseError;
 
     use super::{SegmentSize::*, *};
-    use crate::{layout, prelude::Constraint::*};
+    use crate::{prelude::Constraint::*, split_layout};
 
     #[test]
     fn macro_constraints() {
@@ -872,7 +872,7 @@ mod tests {
             height: 10,
         };
 
-        let [rect1, rect2] = *layout!(["100%", ">=3"], rect) else {
+        let [rect1, rect2] = *split_layout!(["100%", ">=3"], rect) else {
             panic!("unable to extract")
         };
         assert_eq!(rect1, Rect::new(0, 0, 10, 7));
